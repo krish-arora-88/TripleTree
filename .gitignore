@@ -27,6 +27,7 @@ CMakeUserPresets.json
 # Web frontend
 web/node_modules/
 web/dist/
+web/package-lock.json
 
 # WASM artifacts are committed so Vercel can deploy without Emscripten.
 # Regenerate with: cd web && npm run build:wasm

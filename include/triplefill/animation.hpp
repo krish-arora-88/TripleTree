@@ -2,10 +2,16 @@
 
 #include "image.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <vector>
 
 namespace triplefill {
+
+struct FillStats {
+    std::size_t filled_pixels   = 0;
+    std::size_t frames_captured = 0;
+};
 
 class Animation {
 public:
@@ -24,12 +30,16 @@ public:
         return frames_;
     }
 
+    void set_stats(FillStats s) noexcept { stats_ = s; }
+    [[nodiscard]] const FillStats& stats() const noexcept { return stats_; }
+
     void write_last_png(const std::filesystem::path& path) const;
     void write_gif(const std::filesystem::path& path,
                    unsigned delay_cs = 4) const;
 
 private:
     std::vector<Image> frames_;
+    FillStats stats_;
 };
 
 } // namespace triplefill

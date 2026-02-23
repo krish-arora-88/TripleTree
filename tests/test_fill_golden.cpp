@@ -199,3 +199,70 @@ TEST_CASE("Solid fill on fixture image produces deterministic output",
 
     REQUIRE(images_match(anim1.final_frame(), anim2.final_frame()));
 }
+
+// ---------------------------------------------------------------------------
+// maxFrames / frameFreq contract tests
+// ---------------------------------------------------------------------------
+
+TEST_CASE("frameFreq==0 produces exactly 1 frame (final only)", "[fill][frames]") {
+    auto img = make_solid(10, 10, RGBA{200, 200, 200});
+    FillConfig cfg{
+        .seed       = {5, 5},
+        .tolerance  = 1.0,
+        .frame_freq = 0,
+        .algorithm  = Algorithm::BFS,
+        .picker     = SolidPicker{RGBA{255, 0, 0}},
+    };
+
+    auto anim = flood_fill(img, cfg);
+    REQUIRE(anim.size() == 1);
+}
+
+TEST_CASE("maxFrames==nullopt (unlimited) captures all intermediate frames",
+          "[fill][frames]") {
+    auto img = make_solid(10, 10, RGBA{200, 200, 200});
+    FillConfig cfg{
+        .seed       = {5, 5},
+        .tolerance  = 1.0,
+        .frame_freq = 10,
+        .algorithm  = Algorithm::BFS,
+        .picker     = SolidPicker{RGBA{255, 0, 0}},
+    };
+    // max_frames defaults to nullopt (unlimited)
+
+    auto anim = flood_fill(img, cfg);
+    // 100 pixels / freq 10 = 10 intermediate + 1 final = 11
+    REQUIRE(anim.size() == 11);
+}
+
+TEST_CASE("maxFrames caps intermediate frames but always includes final",
+          "[fill][frames]") {
+    auto img = make_solid(10, 10, RGBA{200, 200, 200});
+    FillConfig cfg{
+        .seed       = {5, 5},
+        .tolerance  = 1.0,
+        .frame_freq = 10,
+        .algorithm  = Algorithm::BFS,
+        .picker     = SolidPicker{RGBA{255, 0, 0}},
+        .max_frames = 3,
+    };
+
+    auto anim = flood_fill(img, cfg);
+    // 3 intermediate + 1 final = 4
+    REQUIRE(anim.size() == 4);
+}
+
+TEST_CASE("FillStats records filled_pixels and frames_captured", "[fill][stats]") {
+    auto img = make_solid(5, 5, RGBA{100, 100, 100});
+    FillConfig cfg{
+        .seed       = {2, 2},
+        .tolerance  = 1.0,
+        .frame_freq = 5,
+        .algorithm  = Algorithm::BFS,
+        .picker     = SolidPicker{RGBA{0, 255, 0}},
+    };
+
+    auto anim = flood_fill(img, cfg);
+    REQUIRE(anim.stats().filled_pixels == 25);
+    REQUIRE(anim.stats().frames_captured == anim.size());
+}

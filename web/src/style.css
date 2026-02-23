@@ -336,6 +336,15 @@ input[type="color"] {
   color: var(--danger);
 }
 
+.status.warn {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid #ffc107;
+  color: #ffc107;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 /* Frame scrubber */
 .frame-scrubber {
   margin-top: 0.75rem;

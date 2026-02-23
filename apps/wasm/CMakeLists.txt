@@ -14,7 +14,7 @@ set_target_properties(triplefill_wasm PROPERTIES
 target_link_options(triplefill_wasm PRIVATE
     "SHELL:-s MODULARIZE=1"
     "SHELL:-s EXPORT_NAME='TriplefillModule'"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_run_fill','_fill_create','_fill_frame_count','_fill_get_frame','_fill_destroy','_free_buffer','_malloc','_free']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_run_fill','_fill_create','_fill_frame_count','_fill_get_frame','_fill_get_filled_pixels','_fill_destroy','_fill_last_error_code','_fill_last_error_message','_free_buffer','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','setValue','HEAPU8','HEAPU32','HEAPF64','wasmMemory']"
     "SHELL:-s INITIAL_MEMORY=33554432"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"

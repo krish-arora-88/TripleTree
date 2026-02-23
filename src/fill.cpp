@@ -175,6 +175,8 @@ Animation flood_fill(const Image& img, const FillConfig& cfg) {
     // Always add final frame
     anim.add_frame(canvas);
 
+    anim.set_stats({filled, anim.size()});
+
     return anim;
 }
 

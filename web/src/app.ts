@@ -40,6 +40,7 @@ const pickerParams = $<HTMLDivElement>("#picker-params");
 const frameFreqInput = $<HTMLInputElement>("#frame-freq-input");
 const maxFramesInput = $<HTMLInputElement>("#max-frames-input");
 const runBtn = $<HTMLButtonElement>("#run-btn");
+const warningBanner = $<HTMLDivElement>("#warning-banner");
 const statusEl = $<HTMLDivElement>("#status");
 const outputWrap = $<HTMLDivElement>("#output-canvas-wrap");
 const outputCanvas = $<HTMLCanvasElement>("#output-canvas");
@@ -260,11 +261,41 @@ function setStatus(text: string, cls: "running" | "done" | "error"): void {
   statusEl.innerHTML = text;
 }
 
+function showWarning(text: string | undefined): void {
+  if (text) {
+    warningBanner.hidden = false;
+    warningBanner.textContent = text;
+  } else {
+    warningBanner.hidden = true;
+    warningBanner.textContent = "";
+  }
+}
+
+function validateParams(): string | null {
+  const tol = parseFloat(tolSlider.value);
+  if (isNaN(tol) || tol < 0 || tol > 2) return "Tolerance must be between 0 and 2.";
+
+  const freq = parseInt(frameFreqInput.value, 10);
+  if (isNaN(freq) || freq < 0) return "Frame frequency must be >= 0.";
+
+  const maxF = parseInt(maxFramesInput.value, 10);
+  if (isNaN(maxF) || maxF < 0) return "Max frames must be >= 0.";
+
+  return null;
+}
+
 function runFill(): void {
   if (!state.imageData || !state.seedSet || state.running) return;
 
+  const validationError = validateParams();
+  if (validationError) {
+    setStatus(`Error: ${validationError}`, "error");
+    return;
+  }
+
   state.running = true;
   updateRunButton();
+  showWarning(undefined);
   setStatus('<span class="spinner"></span> Running...', "running");
 
   const rgba = state.imageData.data.buffer.slice(0);
@@ -278,11 +309,11 @@ function runFill(): void {
     seedX: state.seedX,
     seedY: state.seedY,
     tolerance: parseFloat(tolSlider.value),
-    frameFreq: parseInt(frameFreqInput.value, 10),
+    frameFreq: Math.max(0, parseInt(frameFreqInput.value, 10) || 0),
     algo: parseInt(algoSelect.value, 10),
     picker: parseInt(pickerSelect.value, 10),
     pickerParams: getPickerParamsArray(),
-    maxFrames: parseInt(maxFramesInput.value, 10),
+    maxFrames: Math.max(0, parseInt(maxFramesInput.value, 10) || 0),
   };
 
   w.onmessage = (e: MessageEvent) => {
@@ -294,11 +325,17 @@ function runFill(): void {
       return;
     }
 
-    const { frames, width, height, frameCount, timeMs } = e.data;
+    const { frames, width, height, frameCount, timeMs, warning } = e.data;
     state.frames = frames;
     state.currentFrame = frameCount - 1;
 
-    setStatus(`Done in ${timeMs} ms &mdash; ${frameCount} frame${frameCount > 1 ? "s" : ""}`, "done");
+    showWarning(warning);
+
+    let statusText = `Done in ${timeMs} ms &mdash; ${frameCount} frame${frameCount > 1 ? "s" : ""}`;
+    if (warning && frameCount <= 1) {
+      statusText += " (frame capture limited)";
+    }
+    setStatus(statusText, warning ? "done" : "done");
     showFrame(width, height, frameCount - 1);
 
     if (frameCount > 1) {

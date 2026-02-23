@@ -89,6 +89,35 @@ npm run dev               # opens http://localhost:5173
 A single `npm run build` produces a fully static `web/dist/` directory that
 can be deployed to GitHub Pages or any static host.
 
+### Deploying to Vercel
+
+The repo includes a `vercel.json` at the root that configures a static Vite
+deployment. WASM artifacts are committed to `web/public/wasm/` so Vercel does
+not need Emscripten installed.
+
+```bash
+# One-time: install Vercel CLI
+npm i -g vercel
+
+# Deploy (from repo root)
+VITE_BASE=/ vercel --prod
+```
+
+Vercel settings (auto-detected from `vercel.json`):
+- **Install:** `cd web && npm ci`
+- **Build:** `cd web && npm run build`
+- **Output:** `web/dist`
+- **Base path:** Set `VITE_BASE=/` as a Vercel environment variable
+  (defaults to `./` for local/GitHub Pages use).
+
+To rebuild WASM artifacts after C++ changes:
+
+```bash
+cd web && npm run build:wasm   # requires Emscripten SDK
+```
+
+Then commit the updated files in `web/public/wasm/`.
+
 ### How it works
 
 ```

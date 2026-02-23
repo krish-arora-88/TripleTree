@@ -1,7 +1,15 @@
 // Classic Web Worker — loads triplefill WASM module and runs flood fills.
+//
+// maxFrames/frameFreq contract (authoritative):
+//   frameFreq == 0  → final-only (1 frame, no intermediates)
+//   maxFrames == 0  → unlimited intermediate frames (clamped by memory estimate)
+//   maxFrames > 0   → cap intermediate frames to that number; final always appended
 "use strict";
 
 var wasmModule = null;
+
+// 256 MB budget for frame storage (tunable)
+var SAFE_LIMIT_BYTES = 256 * 1024 * 1024;
 
 var ERROR_CODES = {
   "-1": "Invalid arguments",
@@ -34,6 +42,24 @@ function loadModule() {
   });
 }
 
+function getWasmErrorMessage(m) {
+  if (typeof m._fill_last_error_code !== "function") return null;
+  var code = m._fill_last_error_code();
+  if (code === 0) return null;
+  if (typeof m._fill_last_error_message !== "function") return "Error code " + code;
+  var ptr = m._fill_last_error_message();
+  if (ptr) {
+    var msg = "";
+    for (var i = 0; i < 256; i++) {
+      var ch = m.HEAPU8[ptr + i];
+      if (ch === 0) break;
+      msg += String.fromCharCode(ch);
+    }
+    return msg;
+  }
+  return "Error code " + code;
+}
+
 self.onmessage = function (e) {
   var msg = e.data;
   if (msg.type !== "fill") return;
@@ -42,10 +68,59 @@ self.onmessage = function (e) {
 
   loadModule()
     .then(function (m) {
-      var pixelBytes = msg.width * msg.height * 4;
+      var width = msg.width;
+      var height = msg.height;
+      var pixelBytes = width * height * 4;
+      var bytesPerFrame = pixelBytes;
+      var warnings = [];
 
+      // ---- Preflight memory estimate + auto-clamp ----
+      var wantFrames = msg.frameFreq > 0;
+      var requestedMaxFrames = msg.maxFrames;
+      var effectiveMaxFrames = requestedMaxFrames;
+
+      if (wantFrames) {
+        if (requestedMaxFrames === 0) {
+          // Unlimited → clamp to safe memory budget
+          var clamp = Math.floor(SAFE_LIMIT_BYTES / bytesPerFrame) - 1;
+          effectiveMaxFrames = Math.max(1, clamp);
+          if (clamp <= 0) {
+            wantFrames = false;
+            warnings.push(
+              "Image too large for frame capture (" +
+                Math.round(bytesPerFrame / 1024) +
+                " KB/frame). Showing final image only."
+            );
+          }
+        } else {
+          var estimatedBytes = bytesPerFrame * (requestedMaxFrames + 1);
+          if (estimatedBytes > SAFE_LIMIT_BYTES) {
+            var clampedMax = Math.max(
+              1,
+              Math.floor(SAFE_LIMIT_BYTES / bytesPerFrame) - 1
+            );
+            effectiveMaxFrames = Math.min(requestedMaxFrames, clampedMax);
+            warnings.push(
+              "Reduced max frames from " +
+                requestedMaxFrames +
+                " to " +
+                effectiveMaxFrames +
+                " to stay within memory limits."
+            );
+          }
+        }
+      }
+
+      var estimatedBytes = wantFrames
+        ? bytesPerFrame * (effectiveMaxFrames + 1)
+        : bytesPerFrame;
+
+      // ---- Allocate input ----
       var inPtr = m._malloc(pixelBytes);
-      if (!inPtr) throw new Error("Failed to allocate input buffer (" + pixelBytes + " bytes)");
+      if (!inPtr)
+        throw new Error(
+          "Failed to allocate input buffer (" + pixelBytes + " bytes)"
+        );
       m.HEAPU8.set(new Uint8Array(msg.rgba), inPtr);
 
       var ppLen = msg.pickerParams.length;
@@ -54,29 +129,54 @@ self.onmessage = function (e) {
         m.setValue(ppPtr + i * 8, msg.pickerParams[i], "double");
       }
 
-      var wantFrames = msg.frameFreq > 0 && msg.maxFrames !== 0;
       var frames = [];
       var frameCount = 0;
+      var filledPixels = 0;
+      var status = "ok";
 
       if (wantFrames) {
         var handle = m._fill_create(
-          inPtr, msg.width, msg.height,
-          msg.seedX, msg.seedY,
-          msg.tolerance, msg.frameFreq,
-          msg.algo, msg.picker,
-          ppPtr, ppLen, msg.maxFrames
+          inPtr,
+          width,
+          height,
+          msg.seedX,
+          msg.seedY,
+          msg.tolerance,
+          msg.frameFreq,
+          msg.algo,
+          msg.picker,
+          ppPtr,
+          ppLen,
+          effectiveMaxFrames
         );
 
         if (!handle) {
-          // Retry without frames (final only) as fallback
+          // Frame capture failed — get error from WASM
+          var wasmErr = getWasmErrorMessage(m);
+          status = "warn";
+          warnings.push(
+            "Frame capture disabled" +
+              (wasmErr ? " (" + wasmErr + ")" : " (out of memory)") +
+              ". Showing final image only."
+          );
+
+          // Fallback to final-only
           var outPtrPtr = m._malloc(4);
           var outSizePtr = m._malloc(4);
           var rc = m._run_fill(
-            inPtr, msg.width, msg.height,
-            msg.seedX, msg.seedY,
-            msg.tolerance, 0,
-            msg.algo, msg.picker,
-            ppPtr, ppLen, outPtrPtr, outSizePtr
+            inPtr,
+            width,
+            height,
+            msg.seedX,
+            msg.seedY,
+            msg.tolerance,
+            0,
+            msg.algo,
+            msg.picker,
+            ppPtr,
+            ppLen,
+            outPtrPtr,
+            outSizePtr
           );
           if (rc !== 0) throw new Error(describeError(rc));
           var outPtr = m.getValue(outPtrPtr, "*");
@@ -86,25 +186,39 @@ self.onmessage = function (e) {
           m._free(outPtrPtr);
           m._free(outSizePtr);
         } else {
+          if (typeof m._fill_get_filled_pixels === "function") {
+            filledPixels = m._fill_get_filled_pixels(handle);
+          }
           frameCount = m._fill_frame_count(handle);
           for (var i = 0; i < frameCount; i++) {
             var framePtr = m._fill_get_frame(handle, i);
             if (framePtr) {
-              frames.push(m.HEAPU8.slice(framePtr, framePtr + pixelBytes).buffer);
+              frames.push(
+                m.HEAPU8.slice(framePtr, framePtr + pixelBytes).buffer
+              );
             }
           }
           m._fill_destroy(handle);
           frameCount = frames.length;
         }
       } else {
+        // Final-only path
         var outPtrPtr = m._malloc(4);
         var outSizePtr = m._malloc(4);
         var rc = m._run_fill(
-          inPtr, msg.width, msg.height,
-          msg.seedX, msg.seedY,
-          msg.tolerance, msg.frameFreq,
-          msg.algo, msg.picker,
-          ppPtr, ppLen, outPtrPtr, outSizePtr
+          inPtr,
+          width,
+          height,
+          msg.seedX,
+          msg.seedY,
+          msg.tolerance,
+          msg.frameFreq,
+          msg.algo,
+          msg.picker,
+          ppPtr,
+          ppLen,
+          outPtrPtr,
+          outSizePtr
         );
         if (rc !== 0) throw new Error(describeError(rc));
         var outPtr = m.getValue(outPtrPtr, "*");
@@ -120,8 +234,28 @@ self.onmessage = function (e) {
 
       var elapsed = performance.now() - t0;
       self.postMessage(
-        { type: "result", frames: frames, width: msg.width,
-          height: msg.height, frameCount: frameCount, timeMs: Math.round(elapsed) },
+        {
+          type: "result",
+          frames: frames,
+          width: width,
+          height: height,
+          frameCount: frameCount,
+          timeMs: Math.round(elapsed),
+          status: status,
+          warning: warnings.length > 0 ? warnings.join(" ") : undefined,
+          memory: {
+            bytesPerFrame: bytesPerFrame,
+            safeLimitBytes: SAFE_LIMIT_BYTES,
+            requestedMaxFrames: requestedMaxFrames,
+            effectiveMaxFrames: effectiveMaxFrames,
+            estimatedBytes: estimatedBytes,
+          },
+          stats: {
+            framesCaptured: frameCount,
+            filledPixels: filledPixels,
+            algo: msg.algo === 1 ? "DFS" : "BFS",
+          },
+        },
         frames
       );
     })

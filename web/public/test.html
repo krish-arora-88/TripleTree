@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head><title>WASM Test</title></head>
+<body>
+<pre id="log">Running tests...</pre>
+<canvas id="c" width="200" height="200"></canvas>
+<script>
+const log = document.getElementById("log");
+function out(msg) { log.textContent += "\n" + msg; console.log(msg); }
+
+async function runTests() {
+  try {
+    // Create test image
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ff0000";
+    ctx.fillRect(0, 0, 200, 200);
+    ctx.fillStyle = "#0000ff";
+    ctx.beginPath(); ctx.arc(100, 100, 50, 0, Math.PI*2); ctx.fill();
+    const imageData = ctx.getImageData(0, 0, 200, 200);
+
+    // Test 1: Worker with run_fill (final only)
+    out("Test 1: Worker run_fill (final only)...");
+    const result1 = await runWorker(imageData, { frameFreq: 0, maxFrames: 0 });
+    out("  " + result1.frameCount + " frame, " + result1.timeMs + "ms");
+    if (result1.type !== "result") throw new Error("Expected result: " + result1.message);
+    if (result1.frameCount !== 1) throw new Error("Expected 1 frame");
+    out("  PASS");
+
+    // Test 2: Worker with frames
+    out("Test 2: Worker fill_create (with frames)...");
+    const result2 = await runWorker(imageData, { frameFreq: 500, maxFrames: 10 });
+    out("  " + result2.frameCount + " frames, " + result2.timeMs + "ms");
+    if (result2.type !== "result") throw new Error("Expected result: " + result2.message);
+    if (result2.frameCount < 2) throw new Error("Expected multiple frames");
+    out("  PASS");
+
+    // Test 3: Render result
+    out("Test 3: Render output...");
+    const outData = new ImageData(new Uint8ClampedArray(result2.frames[result2.frameCount-1]), 200, 200);
+    ctx.putImageData(outData, 0, 0);
+    // Check seed pixel is green
+    const px = ctx.getImageData(10, 10, 1, 1).data;
+    if (px[1] < 200) throw new Error("Seed pixel not green: g=" + px[1]);
+    out("  PASS");
+
+    out("\nAll tests passed!");
+    document.title = "PASS";
+  } catch (e) {
+    out("\nFAILED: " + e.message);
+    document.title = "FAIL: " + e.message;
+  }
+}
+
+function runWorker(imageData, opts) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker("/fillWorker.js");
+    const rgba = imageData.data.buffer.slice(0);
+    worker.onmessage = e => { worker.terminate(); resolve(e.data); };
+    worker.onerror = e => { reject(new Error(e.message)); };
+    worker.postMessage({
+      type: "fill",
+      rgba: rgba,
+      width: 200, height: 200,
+      seedX: 10, seedY: 10,
+      tolerance: 0.1,
+      frameFreq: opts.frameFreq,
+      algo: 0, picker: 0,
+      pickerParams: [0, 255, 0, 255],
+      maxFrames: opts.maxFrames,
+    }, [rgba]);
+  });
+}
+
+runTests();
+</script>
+</body>
+</html>

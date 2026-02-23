@@ -61,12 +61,75 @@ ctest --test-dir build --output-on-failure
 
 Run `triplefill --help` for the full option list.
 
+## Web demo
+
+An interactive in-browser demo powered by WebAssembly (Emscripten). Drag & drop
+a PNG, click a seed point, choose an algorithm and picker, and watch the fill
+happen — all computed off-thread in a Web Worker.
+
+### Prerequisites
+
+- **Emscripten SDK** — install from
+  <https://emscripten.org/docs/getting_started/downloads.html> and source
+  `emsdk_env.sh` so that `emcmake` / `emmake` are on PATH.
+- **Node.js** ≥ 18
+
+### Quick start
+
+```bash
+# 1. Build the WASM module
+cd web
+npm install
+npm run build:wasm        # configures + compiles triplefill → WASM
+
+# 2. Start the dev server
+npm run dev               # opens http://localhost:5173
+```
+
+A single `npm run build` produces a fully static `web/dist/` directory that
+can be deployed to GitHub Pages or any static host.
+
+### How it works
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Browser (main thread)                                   │
+│  ┌──────────┐  RGBA buffer   ┌──────────────────────┐   │
+│  │  Canvas   │ ──────────▶  │  Web Worker            │   │
+│  │  (input)  │              │  loads triplefill.wasm  │   │
+│  └──────────┘  ◀──────────  │  calls run_fill()      │   │
+│  ┌──────────┐  RGBA frames  └──────────────────────┘   │
+│  │  Canvas   │              Transferable ArrayBuffers    │
+│  │  (output) │              (zero-copy)                  │
+│  └──────────┘                                            │
+└──────────────────────────────────────────────────────────┘
+```
+
+The WASM module exposes a minimal C ABI (`run_fill`, `run_fill_with_frames`,
+`free_buffer`). No internal C++ classes are exposed. The JS worker marshals
+RGBA buffers in and out and uses `Transferable` objects to avoid copies.
+
+### Known limitations
+
+- Very large images (> 4000 × 4000) may be slow or exhaust WASM memory.
+  The module caps at 1 GB.
+- Frame capture with many frames increases memory proportionally;
+  use `max_frames` to cap.
+- The WASM module is built with `ENVIRONMENT='worker'` — it cannot be loaded
+  on the main thread.
+
 ## Project layout
 
 ```
 include/triplefill/    Public headers (library API)
 src/                   Library implementation
 apps/cli/              Command-line frontend
+apps/wasm/             WebAssembly bindings (Emscripten)
+web/                   Vite + TypeScript web frontend
+  src/                 Application source
+    worker/            Web Worker (loads WASM, runs fills)
+  public/wasm/         WASM build artifacts (generated)
+  scripts/             Build automation
 tests/                 Catch2 unit + golden-image tests
 third_party/           Vendored dependencies (lodepng, Catch2, gif encoder)
 cmake/                 CMake helpers (sanitisers, toolchains)

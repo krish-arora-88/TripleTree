@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>triplefill — Flood Fill Demo</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>triplefill</h1>
+    <p class="subtitle">Interactive flood-fill demo &mdash; powered by WebAssembly</p>
+  </header>
+
+  <main>
+    <!-- Left: Input -->
+    <section class="panel panel-input">
+      <h2>Input</h2>
+
+      <div id="drop-zone" class="drop-zone">
+        <p>Drag &amp; drop a PNG here</p>
+        <p class="drop-zone-alt">or</p>
+        <label class="btn btn-secondary">
+          Choose file
+          <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" hidden />
+        </label>
+      </div>
+
+      <div id="input-canvas-wrap" class="canvas-wrap" hidden>
+        <canvas id="input-canvas"></canvas>
+        <div id="seed-marker" class="seed-marker" hidden></div>
+        <p class="hint">Click to move seed point</p>
+      </div>
+
+      <button id="upload-another" class="btn btn-secondary btn-sm" hidden>Upload another image</button>
+    </section>
+
+    <!-- Center: Controls -->
+    <section class="panel panel-controls">
+      <h2>Settings</h2>
+
+      <div class="control-group">
+        <label for="algo-select">Algorithm</label>
+        <select id="algo-select">
+          <option value="0">BFS (breadth-first)</option>
+          <option value="1">DFS (depth-first)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="seed-size-slider">
+          Seed marker size <span id="seed-size-value" class="value-badge">28</span>px
+        </label>
+        <input type="range" id="seed-size-slider" min="8" max="80" step="1" value="28" />
+      </div>
+
+      <div class="control-group">
+        <label for="tolerance-slider">
+          Tolerance <span id="tolerance-value" class="value-badge">0.10</span>
+        </label>
+        <input type="range" id="tolerance-slider" min="0" max="1.2" step="0.01" value="0.10" />
+      </div>
+
+      <div class="control-group">
+        <label for="picker-select">Color Picker</label>
+        <select id="picker-select">
+          <option value="0">Solid</option>
+          <option value="1">Stripe</option>
+          <option value="2">Quarter</option>
+          <option value="3">Border</option>
+        </select>
+      </div>
+
+      <!-- Dynamic picker params -->
+      <div id="picker-params"></div>
+
+      <div class="control-group">
+        <label for="frame-freq-input">Frame frequency</label>
+        <input type="number" id="frame-freq-input" min="0" max="100000" value="5000" />
+        <span class="hint-text">0 = final only</span>
+      </div>
+
+      <div class="control-group">
+        <label for="max-frames-input">Max frames</label>
+        <input type="number" id="max-frames-input" min="0" max="200" value="30" />
+        <span class="hint-text">0 = unlimited</span>
+      </div>
+
+      <button id="run-btn" class="btn btn-primary" disabled>Run Fill</button>
+
+      <div id="status" class="status" hidden></div>
+    </section>
+
+    <!-- Right: Output -->
+    <section class="panel panel-output">
+      <h2>Output</h2>
+
+      <div id="output-canvas-wrap" class="canvas-wrap" hidden>
+        <canvas id="output-canvas"></canvas>
+      </div>
+
+      <div id="frame-scrubber" class="frame-scrubber" hidden>
+        <label for="frame-slider">
+          Frame <span id="frame-index">1</span> / <span id="frame-total">1</span>
+        </label>
+        <input type="range" id="frame-slider" min="0" max="0" value="0" />
+      </div>
+
+      <div id="output-placeholder" class="placeholder">
+        <p>Run a fill to see results here</p>
+      </div>
+
+      <div class="export-buttons" id="export-buttons" hidden>
+        <button id="download-png" class="btn btn-primary">Download PNG</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ---- options ---------------------------------------------------------------
 option(TRIPLEFILL_BUILD_TESTS "Build unit tests"     ON)
 option(TRIPLEFILL_BUILD_CLI   "Build CLI application" ON)
+option(TRIPLEFILL_BUILD_WASM  "Build WASM bindings"   OFF)
 option(TRIPLEFILL_SANITIZERS  "Enable ASan + UBSan"   OFF)
 
 include(cmake/Sanitizers.cmake)
@@ -48,6 +49,11 @@ target_compile_options(triplefill PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wpedantic>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>)
 
+if(TRIPLEFILL_BUILD_WASM)
+    target_compile_options(triplefill PRIVATE -fexceptions)
+    target_compile_options(lodepng PRIVATE -fexceptions)
+endif()
+
 if(TRIPLEFILL_SANITIZERS)
     triplefill_add_sanitizers(triplefill)
 endif()
@@ -55,6 +61,11 @@ endif()
 # ---- CLI application -------------------------------------------------------
 if(TRIPLEFILL_BUILD_CLI)
     add_subdirectory(apps/cli)
+endif()
+
+# ---- WASM bindings ---------------------------------------------------------
+if(TRIPLEFILL_BUILD_WASM)
+    add_subdirectory(apps/wasm)
 endif()
 
 # ---- tests -----------------------------------------------------------------

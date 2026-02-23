@@ -23,3 +23,9 @@ Thumbs.db
 
 # CMake user-local
 CMakeUserPresets.json
+
+# Web frontend
+web/node_modules/
+web/dist/
+web/public/wasm/*.js
+web/public/wasm/*.wasm

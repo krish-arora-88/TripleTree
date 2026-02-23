@@ -1,0 +1,4 @@
+add_executable(triplefill_cli main.cpp)
+
+target_link_libraries(triplefill_cli PRIVATE triplefill)
+set_target_properties(triplefill_cli PROPERTIES OUTPUT_NAME triplefill)

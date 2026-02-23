@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+build-*/
+
+# Object files
+*.o
+*.obj
+
+# Compiled binaries
+*.exe
+*.out
+testpa3
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# CMake user-local
+CMakeUserPresets.json

@@ -1,0 +1,47 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "dev",
+            "displayName": "Development",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "TRIPLEFILL_BUILD_TESTS": "ON",
+                "TRIPLEFILL_BUILD_CLI": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release",
+            "binaryDir": "${sourceDir}/build-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "TRIPLEFILL_BUILD_TESTS": "OFF",
+                "TRIPLEFILL_BUILD_CLI": "ON"
+            }
+        },
+        {
+            "name": "sanitize",
+            "displayName": "Debug + Sanitizers",
+            "inherits": "dev",
+            "binaryDir": "${sourceDir}/build-sanitize",
+            "cacheVariables": {
+                "TRIPLEFILL_SANITIZERS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "dev",      "configurePreset": "dev" },
+        { "name": "release",  "configurePreset": "release" },
+        { "name": "sanitize", "configurePreset": "sanitize" }
+    ],
+    "testPresets": [
+        {
+            "name": "dev",
+            "configurePreset": "dev",
+            "output": { "outputOnFailure": true }
+        }
+    ]
+}
